@@ -22,24 +22,22 @@ import (
 func main() {
 
 	certpool := x509.NewCertPool()
-	sCert, err := ioutil.ReadFile("../../certs/server.crt")
+	caPem, err := ioutil.ReadFile("../../certs/CA.pem")
 	if err != nil {
-		logrus.WithError(err).Fatal(`ReadFile("../../certs/server.crt")`)
+		logrus.WithError(err).Fatal(`ioutil.ReadFile("../../certs/CA.pem")`)
 	}
-	sKey, err := ioutil.ReadFile("../../certs/server.key")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ReadFile("../../certs/server.key")`)
-	}
-	if ok := certpool.AppendCertsFromPEM(append(sCert, sKey...)); !ok {
+	if ok := certpool.AppendCertsFromPEM(caPem); !ok {
 		logrus.Fatal("Bad Certs.")
 	}
-	pair, err := tls.LoadX509KeyPair("../../certs/server.crt", "../../certs/server.key")
+	pair, err := tls.LoadX509KeyPair("../../certs/client.crt", "../../certs/client.key")
 	if err != nil {
-		logrus.WithError(err).Fatal(`tls.LoadX509KeyPair("../../certs/server.crt","../../certs/server.key")`)
+		logrus.WithError(err).Fatal(`tls.LoadX509KeyPair("../../certs/client.crt", "../../certs/client.key")`)
 	}
 	creds := credentials.NewTLS(&tls.Config{
-		Certificates:       []tls.Certificate{pair},
-		InsecureSkipVerify: true,
+		Certificates: []tls.Certificate{pair},
+		ServerName:   "ldbgrpc",
+		RootCAs:      certpool,
+		// InsecureSkipVerify: true,
 	})
 
 	conn, err := grpc.Dial("localhost:9090", grpc.WithTransportCredentials(creds))
