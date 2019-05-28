@@ -60,10 +60,11 @@ func main() {
 		logrus.WithField("CachePath", cachePath).WithError(err).Panic("net.Listener() bind failed.")
 	}
 
-	sopts := []grpc.ServerOption{grpc.Creds(credentials.NewClientTLSFromCert(certpool, "ldbgrpc:9090"))}
+	sopts := []grpc.ServerOption{grpc.Creds(credentials.NewClientTLSFromCert(certpool, ""))}
 	creds := credentials.NewTLS(&tls.Config{
-		InsecureSkipVerify: true,
-		RootCAs:            certpool,
+		// InsecureSkipVerify: true,
+		ServerName: "ldbgrpc",
+		RootCAs:    certpool,
 	})
 	dopts := []grpc.DialOption{grpc.WithTransportCredentials(creds)}
 	s := grpc.NewServer(sopts...)

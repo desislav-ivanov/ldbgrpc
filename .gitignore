@@ -5,5 +5,6 @@ cmd/server/server
 cmd/server/cache/
 certs/*.crt
 certs/*.key
+certs/*.pem
 .vscode/
 cmd/client/__pycache__/
