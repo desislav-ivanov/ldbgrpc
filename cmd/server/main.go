@@ -12,6 +12,10 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
+
+	"google.golang.org/grpc/status"
+
 	"google.golang.org/grpc/credentials"
 
 	api "github.com/desoivanov/ldbgrpc/api/proto/v1"
@@ -32,6 +36,36 @@ func grpcHandler(grpcServer *grpc.Server, otherHandler http.Handler) http.Handle
 			otherHandler.ServeHTTP(w, r)
 		}
 	})
+}
+
+// handleStreamError overrides default behavior for computing an error
+// message for a server stream.
+//
+// It uses a default "502 Bad Gateway" HTTP code; only emits "safe"
+// messages; and does not set gRPC code or details fields (so they will
+// be omitted from the resulting JSON object that is sent to client).
+func handleStreamError(ctx context.Context, err error) *runtime.StreamError {
+	code := http.StatusBadGateway
+	msg := "unexpected error"
+	if s, ok := status.FromError(err); ok {
+		code = runtime.HTTPStatusFromCode(s.Code())
+		// default message, based on the name of the gRPC code
+		msg = s.Err().Error()
+		// see if error details include "safe" message to send
+		// to external callers
+		for _, msg := range s.Details() {
+			spew.Dump(msg)
+			// 	if safe, ok := msg.(*status.Status); ok {
+			// 		msg = safe.Message()
+			// 		break
+			// 	}
+		}
+	}
+	return &runtime.StreamError{
+		HttpCode:   int32(code),
+		HttpStatus: http.StatusText(code),
+		Message:    msg,
+	}
 }
 
 func main() {
@@ -78,7 +112,7 @@ func main() {
 		io.Copy(w, strings.NewReader(api.Swagger))
 	})
 
-	gwmux := runtime.NewServeMux()
+	gwmux := runtime.NewServeMux(runtime.WithStreamErrorHandler(handleStreamError))
 	err = api.RegisterCacheHandlerFromEndpoint(ctx, gwmux, ":9090", dopts)
 	if err != nil {
 		logrus.WithError(err).Fatal("RegisterCacheHandlerFromEndpoint")

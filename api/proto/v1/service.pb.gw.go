@@ -45,7 +45,7 @@ func request_Cache_Get_0(ctx context.Context, marshaler runtime.Marshaler, clien
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "key")
 	}
 
-	protoReq.Key, err = runtime.Bytes(val)
+	protoReq.Key, err = runtime.String(val)
 
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "key", err)

@@ -37,13 +37,13 @@ func (s CacheServiceServer) Get(ctx context.Context, p *v1.SearchKey) (*v1.Paylo
 		return nil, err
 	}
 	defer tx.Release()
-	rsp, err := tx.Get(p.GetKey(), nil)
+	rsp, err := tx.Get([]byte(p.GetKey()), nil)
 	if err != nil {
 		return nil, err
 	}
 	return &v1.Payload{
 		Key:   p.GetKey(),
-		Value: rsp}, nil
+		Value: string(rsp)}, nil
 }
 
 func (s CacheServiceServer) GetMany(stream v1.Cache_GetManyServer) error {
@@ -60,10 +60,10 @@ func (s CacheServiceServer) GetMany(stream v1.Cache_GetManyServer) error {
 		if e == io.EOF {
 			break
 		}
-		if v, e := tx.Get(k.GetKey(), nil); e == nil {
+		if v, e := tx.Get([]byte(k.GetKey()), nil); e == nil {
 			if serr := stream.Send(&v1.Payload{
 				Key:   k.GetKey(),
-				Value: v,
+				Value: string(v),
 			}); serr != nil {
 				return serr
 			}
@@ -89,8 +89,8 @@ func (s CacheServiceServer) GetAll(empty *empty.Empty, stream v1.Cache_GetAllSer
 	defer iter.Release()
 	for iter.Next() {
 		if serr := stream.Send(&v1.Payload{
-			Key:   iter.Key(),
-			Value: iter.Value(),
+			Key:   string(iter.Key()),
+			Value: string(iter.Value()),
 		}); serr != nil {
 			return serr
 		}
@@ -115,7 +115,7 @@ func (s CacheServiceServer) Put(stream v1.Cache_PutServer) error {
 			stream.SendAndClose(&v1.Status{Code: v1.Status_Error})
 			return e
 		}
-		if err := tx.Put(m.GetKey(), m.GetValue(), nil); err != nil {
+		if err := tx.Put([]byte(m.GetKey()), []byte(m.GetValue()), nil); err != nil {
 			tx.Discard()
 			stream.SendAndClose(&v1.Status{Code: v1.Status_Error})
 			return err
@@ -147,7 +147,7 @@ func (s CacheServiceServer) Delete(stream v1.Cache_DeleteServer) error {
 			stream.SendAndClose(&v1.Status{Code: v1.Status_Error})
 			return e
 		}
-		if err := tx.Delete(m.GetKey(), nil); err != nil {
+		if err := tx.Delete([]byte(m.GetKey()), nil); err != nil {
 			tx.Discard()
 			stream.SendAndClose(&v1.Status{Code: v1.Status_Error})
 			return err
