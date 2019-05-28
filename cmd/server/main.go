@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/signal"
 
-	api "github.com/desoivanov/dreddit-ops/dreddit-lcache/api/proto/v1"
-	services "github.com/desoivanov/dreddit-ops/dreddit-lcache/api/service/v1"
+	api "github.com/desoivanov/ldbgrpc/api/proto/v1"
+	services "github.com/desoivanov/ldbgrpc/api/service/v1"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
