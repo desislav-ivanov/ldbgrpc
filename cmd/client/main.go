@@ -10,7 +10,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	v1 "github.com/desoivanov/dreddit-ops/dreddit-lcache/api/proto/v1"
+	v1 "github.com/desoivanov/ldbgrpc/api/proto/v1"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
