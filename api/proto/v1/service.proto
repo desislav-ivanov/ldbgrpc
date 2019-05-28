@@ -1,0 +1,56 @@
+syntax = "proto3";
+package v1;
+
+import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
+
+message Status {
+    enum Response {
+        OK = 0;
+        Error = 1;
+    }
+    Response code = 1;   
+}
+
+message SearchKey {
+    bytes key = 1;
+}
+
+message Payload {
+    bytes key = 1;
+    bytes value = 2;
+}
+
+service Cache {
+    rpc Get(SearchKey) returns (Payload){
+        option (google.api.http) = {
+            post: "/v1/cache/Get"
+            body: "*"
+        };
+    };
+    rpc GetMany(stream SearchKey) returns (stream Payload){
+        option (google.api.http) = {
+            post: "/v1/cache/GetMany"
+            body: "*"
+        };
+    };
+    rpc GetAll(google.protobuf.Empty) returns (stream Payload){
+        option (google.api.http) = {
+            post: "/v1/cache/GetAll"
+            body: "*"
+        };
+    };
+    rpc Put(stream Payload) returns (Status){
+        option (google.api.http) = {
+            post: "/v1/cache/Put"
+            body: "*"
+        };
+    };
+    rpc Delete(stream SearchKey) returns (Status){
+        option (google.api.http) = {
+            post: "/v1/cache/Delete"
+            body: "*"
+        };
+    };
+}
+

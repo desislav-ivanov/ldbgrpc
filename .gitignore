@@ -1,6 +1,8 @@
-dreddit-lcache
+ldbgrpc
 cache/
 cmd/client/client
 cmd/server/server
 cmd/server/cache/
+certs/*.crt
+certs/*.key
 .vscode/
