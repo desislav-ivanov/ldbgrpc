@@ -13,12 +13,12 @@ message Status {
 }
 
 message SearchKey {
-    bytes key = 1;
+    string key = 1;
 }
 
 message Payload {
-    bytes key = 1;
-    bytes value = 2;
+    string key = 1;
+    string value = 2;
 }
 
 service Cache {

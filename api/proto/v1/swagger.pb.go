@@ -37,8 +37,7 @@ swagger = `{
             "in": "body",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "byte"
+              "type": "string"
             }
           }
         ],
@@ -63,8 +62,7 @@ swagger = `{
             "name": "key",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "byte"
+            "type": "string"
           }
         ],
         "tags": [
@@ -106,8 +104,7 @@ swagger = `{
             "in": "body",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "byte"
+              "type": "string"
             }
           }
         ],
@@ -194,12 +191,10 @@ swagger = `{
       "type": "object",
       "properties": {
         "key": {
-          "type": "string",
-          "format": "byte"
+          "type": "string"
         },
         "value": {
-          "type": "string",
-          "format": "byte"
+          "type": "string"
         }
       }
     },

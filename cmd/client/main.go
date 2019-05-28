@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,6 +19,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
+
+type JSONDATA struct {
+	Values map[string]string
+}
 
 func main() {
 
@@ -50,7 +55,7 @@ func main() {
 	defer cancel()
 
 	fmt.Println("Get()")
-	p, e := client.Get(ctx, &v1.SearchKey{Key: []byte("test")})
+	p, e := client.Get(ctx, &v1.SearchKey{Key: "test"})
 	if e != nil {
 		logrus.WithError(e).Error("client.Get()")
 	} else {
@@ -64,8 +69,14 @@ func main() {
 		return
 	}
 	for i := 0; i < 10; i++ {
-		key := []byte(fmt.Sprintf("Key%d", i))
-		value := []byte("data")
+		key := fmt.Sprintf("Key%d", i)
+		stuff, _ := json.Marshal(JSONDATA{
+			Values: map[string]string{
+				"test":  "a",
+				"test2": "b",
+			},
+		})
+		value := string(stuff)
 		data := &v1.Payload{
 			Key:   key,
 			Value: value,
@@ -82,7 +93,7 @@ func main() {
 		spew.Dump(s.GetCode())
 	}
 	fmt.Println("Get()")
-	p, e = client.Get(ctx, &v1.SearchKey{Key: []byte("Key1")})
+	p, e = client.Get(ctx, &v1.SearchKey{Key: "Key1"})
 	if e != nil {
 		logrus.WithError(e).Error("client.Get()")
 	} else {
@@ -96,7 +107,7 @@ func main() {
 		return
 	}
 	for i := 0; i < 10; i += 2 {
-		key := []byte(fmt.Sprintf("Key%d", i))
+		key := fmt.Sprintf("Key%d", i)
 		data := &v1.SearchKey{
 			Key: key,
 		}
@@ -146,14 +157,14 @@ func main() {
 		return
 	}
 	key2 := &v1.SearchKey{
-		Key: []byte("Key2"),
+		Key: "Key2",
 	}
 	if e := deletestream.Send(key2); e != nil {
 		logrus.WithError(e).Error("deletestream.Send()")
 	}
 	spew.Dump(key2)
 	key3 := &v1.SearchKey{
-		Key: []byte("Key3"),
+		Key: "Key3",
 	}
 	if e := deletestream.Send(key3); e != nil {
 		logrus.WithError(e).Error("deletestream.Send()")
@@ -190,7 +201,7 @@ func main() {
 		return
 	}
 	for i := 0; i < 10; i += 2 {
-		key := []byte(fmt.Sprintf("Key%d", i))
+		key := fmt.Sprintf("Key%d", i)
 		data := &v1.SearchKey{
 			Key: key,
 		}
@@ -212,6 +223,9 @@ func main() {
 			logrus.WithError(e).Error("getstream.Recv()")
 		} else {
 			spew.Dump(p)
+			var d JSONDATA
+			json.Unmarshal([]byte(p.Value), &d)
+			spew.Dump(d)
 		}
 	}
 

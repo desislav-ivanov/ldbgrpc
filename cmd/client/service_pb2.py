@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='v1',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\rservice.proto\x12\x02v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/api/annotations.proto\"J\n\x06Status\x12!\n\x04\x63ode\x18\x01 \x01(\x0e\x32\x13.v1.Status.Response\"\x1d\n\x08Response\x12\x06\n\x02OK\x10\x00\x12\t\n\x05\x45rror\x10\x01\"\x18\n\tSearchKey\x12\x0b\n\x03key\x18\x01 \x01(\x0c\"%\n\x07Payload\x12\x0b\n\x03key\x18\x01 \x01(\x0c\x12\r\n\x05value\x18\x02 \x01(\x0c\x32\xdf\x02\n\x05\x43\x61\x63he\x12>\n\x03Get\x12\r.v1.SearchKey\x1a\x0b.v1.Payload\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/cache/Get/{key}\x12I\n\x07GetMany\x12\r.v1.SearchKey\x1a\x0b.v1.Payload\"\x1e\x82\xd3\xe4\x93\x02\x18\"\x11/v1/cache/GetMany:\x03key(\x01\x30\x01\x12I\n\x06GetAll\x12\x16.google.protobuf.Empty\x1a\x0b.v1.Payload\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/cache/GetAll0\x01\x12:\n\x03Put\x12\x0b.v1.Payload\x1a\n.v1.Status\"\x18\x82\xd3\xe4\x93\x02\x12\x1a\r/v1/cache/Put:\x01*(\x01\x12\x44\n\x06\x44\x65lete\x12\r.v1.SearchKey\x1a\n.v1.Status\"\x1d\x82\xd3\xe4\x93\x02\x17\"\x10/v1/cache/Delete:\x03key(\x01\x62\x06proto3')
+  serialized_pb=_b('\n\rservice.proto\x12\x02v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/api/annotations.proto\"J\n\x06Status\x12!\n\x04\x63ode\x18\x01 \x01(\x0e\x32\x13.v1.Status.Response\"\x1d\n\x08Response\x12\x06\n\x02OK\x10\x00\x12\t\n\x05\x45rror\x10\x01\"\x18\n\tSearchKey\x12\x0b\n\x03key\x18\x01 \x01(\t\"%\n\x07Payload\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t2\xdf\x02\n\x05\x43\x61\x63he\x12>\n\x03Get\x12\r.v1.SearchKey\x1a\x0b.v1.Payload\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/cache/Get/{key}\x12I\n\x07GetMany\x12\r.v1.SearchKey\x1a\x0b.v1.Payload\"\x1e\x82\xd3\xe4\x93\x02\x18\"\x11/v1/cache/GetMany:\x03key(\x01\x30\x01\x12I\n\x06GetAll\x12\x16.google.protobuf.Empty\x1a\x0b.v1.Payload\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/cache/GetAll0\x01\x12:\n\x03Put\x12\x0b.v1.Payload\x1a\n.v1.Status\"\x18\x82\xd3\xe4\x93\x02\x12\x1a\r/v1/cache/Put:\x01*(\x01\x12\x44\n\x06\x44\x65lete\x12\r.v1.SearchKey\x1a\n.v1.Status\"\x1d\x82\xd3\xe4\x93\x02\x17\"\x10/v1/cache/Delete:\x03key(\x01\x62\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,google_dot_api_dot_annotations__pb2.DESCRIPTOR,])
 
@@ -92,8 +92,8 @@ _SEARCHKEY = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='key', full_name='v1.SearchKey.key', index=0,
-      number=1, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
@@ -123,15 +123,15 @@ _PAYLOAD = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='key', full_name='v1.Payload.key', index=0,
-      number=1, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='value', full_name='v1.Payload.value', index=1,
-      number=2, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
