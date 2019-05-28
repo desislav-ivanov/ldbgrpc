@@ -37,7 +37,8 @@ swagger = `{
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1SearchKey"
+              "type": "string",
+              "format": "byte"
             }
           }
         ],
@@ -46,8 +47,8 @@ swagger = `{
         ]
       }
     },
-    "/v1/cache/Get": {
-      "post": {
+    "/v1/cache/Get/{key}": {
+      "get": {
         "operationId": "Get",
         "responses": {
           "200": {
@@ -59,12 +60,11 @@ swagger = `{
         },
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
+            "name": "key",
+            "in": "path",
             "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1SearchKey"
-            }
+            "type": "string",
+            "format": "byte"
           }
         ],
         "tags": [
@@ -73,7 +73,7 @@ swagger = `{
       }
     },
     "/v1/cache/GetAll": {
-      "post": {
+      "get": {
         "operationId": "GetAll",
         "responses": {
           "200": {
@@ -83,16 +83,6 @@ swagger = `{
             }
           }
         },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "properties": {}
-            }
-          }
-        ],
         "tags": [
           "Cache"
         ]
@@ -116,7 +106,8 @@ swagger = `{
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1SearchKey"
+              "type": "string",
+              "format": "byte"
             }
           }
         ],
@@ -126,7 +117,7 @@ swagger = `{
       }
     },
     "/v1/cache/Put": {
-      "post": {
+      "put": {
         "operationId": "Put",
         "responses": {
           "200": {
@@ -207,15 +198,6 @@ swagger = `{
           "format": "byte"
         },
         "value": {
-          "type": "string",
-          "format": "byte"
-        }
-      }
-    },
-    "v1SearchKey": {
-      "type": "object",
-      "properties": {
-        "key": {
           "type": "string",
           "format": "byte"
         }
