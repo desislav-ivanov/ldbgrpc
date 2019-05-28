@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -13,12 +16,33 @@ import (
 	v1 "github.com/desoivanov/ldbgrpc/api/proto/v1"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
-//go:generate protoc --proto_path=../../api/proto/v1 --go_out=plugins=grpc:../../api/proto/v1 cache-service.proto
-
 func main() {
-	conn, err := grpc.Dial("localhost:9090", grpc.WithInsecure())
+
+	certpool := x509.NewCertPool()
+	sCert, err := ioutil.ReadFile("../../certs/server.crt")
+	if err != nil {
+		logrus.WithError(err).Fatal(`ReadFile("../../certs/server.crt")`)
+	}
+	sKey, err := ioutil.ReadFile("../../certs/server.key")
+	if err != nil {
+		logrus.WithError(err).Fatal(`ReadFile("../../certs/server.key")`)
+	}
+	if ok := certpool.AppendCertsFromPEM(append(sCert, sKey...)); !ok {
+		logrus.Fatal("Bad Certs.")
+	}
+	pair, err := tls.LoadX509KeyPair("../../certs/server.crt", "../../certs/server.key")
+	if err != nil {
+		logrus.WithError(err).Fatal(`tls.LoadX509KeyPair("../../certs/server.crt","../../certs/server.key")`)
+	}
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates:       []tls.Certificate{pair},
+		InsecureSkipVerify: true,
+	})
+
+	conn, err := grpc.Dial("localhost:9090", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		logrus.WithError(err).Fatal("Unable to connect.")
 	}
