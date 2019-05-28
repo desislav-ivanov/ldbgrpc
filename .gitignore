@@ -1,5 +1,4 @@
 dreddit-lcache
-api/proto/*/*.pb.go
 cache/
 cmd/client/client
 cmd/server/server
