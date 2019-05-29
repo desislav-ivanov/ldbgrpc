@@ -3,8 +3,10 @@ cache/
 cmd/client/client
 cmd/server/server
 cmd/server/cache/
-certs/*.crt
-certs/*.key
-certs/*.pem
+**/certs/*.crt
+**/certs/*.key
+**/certs/*.pem
 .vscode/
 cmd/client/__pycache__/
+cmd/server/certmanager/certmanager
+cmd/server/certmanager/certs/
