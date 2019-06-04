@@ -1,0 +1,20 @@
+ca:
+  cn: Root CA
+  notafter: 2029-06-01 13:46:16 +0300 EEST
+  org: ldbgrpc
+client:
+  cn: Client Certificate
+  notafter: 2020-06-03 13:46:16 +0300 EEST
+  org: ldbgrpc
+  ou:
+  - GRPC Client
+server:
+  cn: Server Certificate
+  host:
+  - localhost
+  ips:
+  - 127.0.0.1
+  notafter: 2020-06-03 13:46:16 +0300 EEST
+  org: ldbgrpc
+  ou:
+  - GRPC Server
