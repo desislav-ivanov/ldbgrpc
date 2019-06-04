@@ -1,36 +1,58 @@
-package CacheService
+package v1
 
 import (
 	"context"
 
-	v1 "github.com/desoivanov/ldbgrpc/api/proto/v1"
+	"google.golang.org/grpc/codes"
+
+	"google.golang.org/grpc/status"
+
+	v1 "github.com/desoivanov/ldbgrpc/pkg/api/v1"
 	"github.com/golang/protobuf/ptypes/empty"
 
-	"errors"
 	"io"
 
 	"github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
+const (
+	apiVersion = "v1"
+)
+
 type CacheServiceServer struct {
-	ldb *leveldb.DB
+	ldb    *leveldb.DB
+	logger *logrus.Entry
 }
 
 func NewService(path string) v1.CacheServer {
 	var err error
 	server := new(CacheServiceServer)
+	server.logger = logrus.WithField("_cache_path", path).WithField("apiVersion", apiVersion)
 	server.ldb, err = leveldb.OpenFile(path, nil)
 	if err != nil {
-		logrus.WithError(err).Panic()
+		server.logger.WithError(err).Error("leveldb.OpenFile()")
 		return nil
 	}
 	return server
 }
 
+func (s CacheServiceServer) Log() *logrus.Entry {
+	return s.logger
+}
+
+func (s CacheServiceServer) checkAPI(api string) error {
+	if len(api) > 0 {
+		if apiVersion != api {
+			return status.Errorf(codes.Unimplemented, "unsupported API version: service implements API version '%s', but asked for '%s'", apiVersion, api)
+		}
+	}
+	return nil
+}
+
 func (s CacheServiceServer) Get(ctx context.Context, p *v1.SearchKey) (*v1.Payload, error) {
 	if s.ldb == nil {
-		return nil, errors.New("ldb closed.")
+		return nil, status.Errorf(codes.Internal, "leveldb closed")
 	}
 	tx, err := s.ldb.GetSnapshot()
 	if err != nil {
@@ -48,7 +70,7 @@ func (s CacheServiceServer) Get(ctx context.Context, p *v1.SearchKey) (*v1.Paylo
 
 func (s CacheServiceServer) GetMany(stream v1.Cache_GetManyServer) error {
 	if s.ldb == nil {
-		return errors.New("ldb closed.")
+		return status.Errorf(codes.Internal, "leveldb closed")
 	}
 	tx, err := s.ldb.GetSnapshot()
 	if err != nil {
@@ -78,7 +100,7 @@ func (s CacheServiceServer) GetMany(stream v1.Cache_GetManyServer) error {
 
 func (s CacheServiceServer) GetAll(empty *empty.Empty, stream v1.Cache_GetAllServer) error {
 	if s.ldb == nil {
-		return errors.New("ldb closed.")
+		return status.Errorf(codes.Internal, "leveldb closed")
 	}
 	tx, err := s.ldb.GetSnapshot()
 	if err != nil {
@@ -100,7 +122,7 @@ func (s CacheServiceServer) GetAll(empty *empty.Empty, stream v1.Cache_GetAllSer
 
 func (s CacheServiceServer) Put(stream v1.Cache_PutServer) error {
 	if s.ldb == nil {
-		return errors.New("ldb closed.")
+		return status.Errorf(codes.Internal, "leveldb closed")
 	}
 	tx, err := s.ldb.OpenTransaction()
 	if err != nil {
@@ -132,7 +154,7 @@ func (s CacheServiceServer) Put(stream v1.Cache_PutServer) error {
 
 func (s CacheServiceServer) Delete(stream v1.Cache_DeleteServer) error {
 	if s.ldb == nil {
-		return errors.New("ldb closed.")
+		return status.Errorf(codes.Internal, "leveldb closed")
 	}
 	tx, err := s.ldb.OpenTransaction()
 	if err != nil {
@@ -164,4 +186,5 @@ func (s CacheServiceServer) Delete(stream v1.Cache_DeleteServer) error {
 
 func (s CacheServiceServer) Shutdown() {
 	s.ldb.Close()
+	s.ldb = nil
 }
