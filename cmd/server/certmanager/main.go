@@ -18,8 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/sirupsen/logrus"
@@ -59,9 +58,9 @@ var (
 	}
 )
 
-func init() {
-	logrus.SetReportCaller(false)
-}
+var CAPair *CertPair
+var DefaultServer *CertPair
+var DefaultClient *CertPair
 
 type CertType int
 
@@ -82,11 +81,11 @@ type CertPair struct {
 	CertType CertType
 }
 
-func CertLoad(path string, password ...string) CertPair {
+func CertLoad(path string, password ...string) *CertPair {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		logrus.WithError(err).Error("Unable to read " + path)
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	certcount := 0
 	keycount := 0
@@ -104,20 +103,20 @@ func CertLoad(path string, password ...string) CertPair {
 	}
 	if certcount > 1 || keycount > 1 {
 		logrus.WithField("Certificates", certcount).WithField("Keys", keycount).Error("More than one key/certificate present.")
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	if keycount == 0 {
 		logrus.Error("Missing key.")
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	if certcount == 0 {
 		logrus.Error("Missing Certificate.")
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	pkey, err := ioutil.ReadFile(keyPath)
 	if err != nil {
 		logrus.WithError(err).Error(`ioutil.ReadFile(` + keyPath + `)`)
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	pblock, _ := pem.Decode(pkey)
 	if x509.IsEncryptedPEMBlock(pblock) {
@@ -126,56 +125,82 @@ func CertLoad(path string, password ...string) CertPair {
 			tmp, err := x509.DecryptPEMBlock(pblock, []byte(phrase))
 			if err != nil {
 				logrus.WithError(err).Error("Invalid password for private key.")
-				return CertPair{CertType: InvalidCert}
+				return nil
 			}
 			pblock.Bytes = tmp
 		} else {
 			logrus.Error("Password for private key not provided.")
-			return CertPair{CertType: InvalidCert}
+			return nil
 		}
 	}
 	key, err := x509.ParseECPrivateKey(pblock.Bytes)
 	if err != nil {
 		logrus.WithError(err).Error(`x509.ParseECPrivateKey(pkey)`)
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	dcert, err := ioutil.ReadFile(crtPath)
 	if err != nil {
 		logrus.WithError(err).Error(`ioutil.ReadFile(` + crtPath + `)`)
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	cblock, _ := pem.Decode(dcert)
 	cert, err := x509.ParseCertificate(cblock.Bytes)
 	if err != nil {
 		logrus.WithError(err).Error(`x509.ParseCertificate(cblock.Bytes)`)
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
 		logrus.Error(keyPath, "does not match", crtPath)
-		return CertPair{CertType: InvalidCert}
+		return nil
 	}
 	if cert.IsCA && cert.KeyUsage&x509.KeyUsageCertSign == x509.KeyUsageCertSign {
-		return CertPair{
+		return &CertPair{
 			cert:     cert,
 			key:      key,
 			CertType: CACert,
 		}
 	}
 	if !cert.IsCA && cert.KeyUsage&x509.KeyUsageKeyEncipherment == x509.KeyUsageKeyEncipherment && cert.KeyUsage&x509.KeyUsageDigitalSignature == x509.KeyUsageDigitalSignature {
-		return CertPair{
+		return &CertPair{
 			cert:     cert,
 			key:      key,
 			CertType: ServerCert,
 		}
 	}
 	if !cert.IsCA && cert.KeyUsage&x509.KeyUsageDigitalSignature == x509.KeyUsageDigitalSignature {
-		return CertPair{
+		return &CertPair{
 			cert:     cert,
 			key:      key,
 			CertType: ClientCert,
 		}
 	}
-	return CertPair{CertType: InvalidCert}
+	return nil
+}
+
+func CertGen(gentype CertType, template *x509.Certificate, CAPair ...*CertPair) *CertPair {
+	var cert *x509.Certificate
+	key := genPrivateKey(elliptic.P256())
+	switch gentype {
+	case CACert:
+		cert = genCert(key, template, template, key)
+		return &CertPair{
+			cert:     cert,
+			key:      key,
+			CertType: gentype,
+		}
+	case ServerCert, ClientCert:
+		if len(CAPair) == 1 {
+			cert = genCert(key, template, CAPair[0].cert, CAPair[0].key)
+			return &CertPair{
+				cert:     cert,
+				key:      key,
+				CertType: gentype,
+			}
+		}
+	default:
+		return nil
+	}
+	return nil
 }
 
 func (p *CertPair) Validate(CA ...*CertPair) bool {
@@ -198,6 +223,9 @@ func (p *CertPair) MustValidate(CA ...*CertPair) {
 }
 
 func (p *CertPair) Save(path string, password ...string) error {
+	if err := os.MkdirAll(path, 0700); err != nil {
+		logrus.WithError(err).Fatal(`os.MkdirAll(` + path + `, 0600)`)
+	}
 	keyOut := &bytes.Buffer{}
 	certOut := &bytes.Buffer{}
 	if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: p.cert.Raw}); pemErr != nil {
@@ -231,6 +259,7 @@ func (p *CertPair) Save(path string, password ...string) error {
 	}
 	certOut.Reset()
 	keyOut.Reset()
+	logrus.Info("Certificate and Key saved at ", path)
 	return nil
 }
 
@@ -279,18 +308,6 @@ func genSerialNumber() *big.Int {
 	return serialNumber
 }
 
-func genCA(rootKey *ecdsa.PrivateKey) (cert *x509.Certificate) {
-	derBytes, err := x509.CreateCertificate(rand.Reader, &rootTemplate, &rootTemplate, publicKey(rootKey), rootKey)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.CreateCertificate(rand.Reader, &rootTemplate, &rootTemplate, &rootKey.PublicKey, rootKey)`)
-	}
-	cacert, err := x509.ParseCertificate(derBytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseCertificate(derBytes)`)
-	}
-	return cacert
-}
-
 func genCert(privKey *ecdsa.PrivateKey, template *x509.Certificate, CA *x509.Certificate, CAKey *ecdsa.PrivateKey) (cert *x509.Certificate) {
 	derBytes, err := x509.CreateCertificate(rand.Reader, template, CA, publicKey(privKey), CAKey)
 	if err != nil {
@@ -300,9 +317,18 @@ func genCert(privKey *ecdsa.PrivateKey, template *x509.Certificate, CA *x509.Cer
 	if err != nil {
 		logrus.WithError(err).Fatal(`x509.ParseCertificate(derBytes)`)
 	}
-	if verifyCert(template, cert, privKey, CA) {
-		return cert
+	if template.Equal(CA) {
+		logrus.Info("Verifying Self-Signed Certificate.")
+		if verifyCert(template, cert, privKey, cert) {
+			return cert
+		}
+	} else {
+		logrus.Info("Verifying CA-Signed Certificate.")
+		if verifyCert(template, cert, privKey, CA) {
+			return cert
+		}
 	}
+
 	return nil
 }
 
@@ -338,8 +364,7 @@ func findCerts(ctype string) (out []string) {
 		logrus.WithError(err).Fatal("./certs missing.")
 	}
 	for _, f := range servers {
-		if f.IsDir() {
-			logrus.Info(f.Name())
+		if f.IsDir() && f.Name() != "default" {
 			out = append(out, "./certs/"+ctype+"/"+f.Name())
 		}
 	}
@@ -365,7 +390,7 @@ func readConfig(filename string, defaults map[string]interface{}) (*viper.Viper,
 			for k, v := range defaults {
 				tmp.Set(k, v)
 			}
-			if err := tmp.WriteConfigAs(configfile + ".json"); err != nil {
+			if err := tmp.WriteConfigAs(configfile + ".yaml"); err != nil {
 				logrus.WithError(err).Fatal("Unable to write default config")
 			}
 			return v, nil
@@ -374,319 +399,154 @@ func readConfig(filename string, defaults map[string]interface{}) (*viper.Viper,
 	return v, err
 }
 
-func loadCA() (*x509.Certificate, *ecdsa.PrivateKey) {
-	verifyCA()
-	logrus.Info("Verify CA.key match CA.pem")
-	pkey, err := ioutil.ReadFile(CAPATH + "CA.key")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ioutil.ReadFile(CAPATH+"CA.key")`)
-	}
-	pblock, _ := pem.Decode(pkey)
-	key, err := x509.ParseECPrivateKey(pblock.Bytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseECPrivateKey(pkey)`)
-	}
-	dcert, err := ioutil.ReadFile(CAPATH + "CA.pem")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ioutil.ReadFile(CAPATH+"CA.pem")`)
-	}
-	cblock, _ := pem.Decode(dcert)
-	cert, err := x509.ParseCertificate(cblock.Bytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseCertificate(cblock.Bytes)`)
-	}
-	if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-		logrus.Fatal("CA.pem does not match CA.key")
-	}
-	if !cert.NotAfter.Equal(rootTemplate.NotAfter) {
-		logrus.Fatal("CA cert NotAfter does not match config file.")
-	}
-	if cert.Subject.CommonName != rootTemplate.Subject.CommonName {
-		logrus.Fatal("CA cert CommonName does not match config file.")
-	}
-	if !reflect.DeepEqual(cert.Subject.Organization, rootTemplate.Subject.Organization) {
-		logrus.Fatal("CA cert Organization does not match config file.")
-	}
-	if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, rootTemplate.Subject.OrganizationalUnit) {
-		logrus.Fatal("CA cert OrganizationalUnit does not match config file.")
-	}
-	return cert, key
+//COBRA configuration
+
+var rootCmd = &cobra.Command{
+	Use:   "certmanager",
+	Short: "certmanager is Certificate generator targeted for ldbgrpc",
+	Long: `
+	certmanager is "self-signed CA" Certificate manager.
+	it can generate server and client certificates.
+	`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+
+		//Generate defaults if faulty or non existent
+		CAPair = CertLoad(CAPATH)
+		if CAPair == nil || !CAPair.Validate() {
+			logrus.Warn("Generate new master CA from config.")
+			CAPair = CertGen(CACert, &rootTemplate)
+			if err := CAPair.Save(CAPATH); err != nil {
+				logrus.WithError(err).Fatal("Unable to create master CA")
+			}
+		}
+		DefaultServer = CertLoad(SERVERPATH + "default")
+		if DefaultServer == nil || !DefaultServer.Validate(CAPair) {
+			logrus.Warn("Generate new Default Server Certificate from config.")
+			DefaultServer = CertGen(ServerCert, &serverTemplate, CAPair)
+			if err := DefaultServer.Save(SERVERPATH + "default"); err != nil {
+				logrus.WithError(err).Fatal("Unable to create Default Server Certificate")
+			}
+		}
+		DefaultClient = CertLoad(CLIENTPATH + "default")
+		if DefaultClient == nil || !DefaultClient.Validate(CAPair) {
+			logrus.Warn("Generate new Default Client Certificate from config.")
+			DefaultClient = CertGen(ClientCert, &clientTemplate, CAPair)
+			if err := DefaultClient.Save(CLIENTPATH + "default"); err != nil {
+				logrus.WithError(err).Fatal("Unable to create Default Server Certificate")
+			}
+		}
+		CAPair.MustValidate(CAPair)
+		DefaultServer.MustValidate(CAPair)
+		DefaultClient.MustValidate(CAPair)
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
 }
 
-func verifyCA() {
-	if err := os.MkdirAll(CAPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(CAPATH, 0600)`)
-	}
-	if err := os.MkdirAll(SERVERPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(SERVERPATH, 0600)`)
-	}
-	if err := os.MkdirAll(CLIENTPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(CLIENTPATH, 0600)`)
-	}
-	if _, err := os.Stat(CAPATH + "CA.key"); os.IsNotExist(err) {
-		logrus.Info("Generating CA.key")
-		key := genPrivateKey(elliptic.P256())
-		keyOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(keyOut, pemBlockForKey(key)); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(keyOut, pemBlockForKey(key))`)
-		}
-		if ioErr := ioutil.WriteFile(CAPATH+"CA.key", keyOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(CAPATH+"CA.key", keyOut.Bytes(), 0600)`)
-		}
-		keyOut.Reset()
-		logrus.Info("Generating CA.pem")
-		cert := genCA(key)
-		certOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})`)
-		}
-		if ioErr := ioutil.WriteFile(CAPATH+"CA.pem", certOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(CAPATH+"CA.pem", certOut.Bytes(), 0600);`)
-		}
-		certOut.Reset()
-		if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-			logrus.Fatal("CA.pem doesnt not match CA.key")
-		}
-		return
-	}
-	if _, err := os.Stat(CAPATH + "CA.pem"); os.IsNotExist(err) {
-		logrus.Info("Found CA.key, but no CA.pem. Generating CA.pem")
-		pkey, err := ioutil.ReadFile(CAPATH + "CA.key")
-		if err != nil {
-			logrus.WithError(err).Fatal(`ioutil.ReadFile(CAPATH+"CA.key")`)
-		}
-		pblock, _ := pem.Decode(pkey)
-		key, err := x509.ParseECPrivateKey(pblock.Bytes)
-		if err != nil {
-			logrus.WithError(err).Fatal(`x509.ParseECPrivateKey(pkey)`)
-		}
-		cert := genCA(key)
-		certOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})`)
-		}
-		if ioErr := ioutil.WriteFile(CAPATH+"CA.pem", certOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(CAPATH+"CA.pem", certOut.Bytes(), 0600);`)
-		}
-		certOut.Reset()
-		if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-			logrus.Fatal("CA.pem doesnt not match CA.key")
-		}
-		return
-	}
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Prints the version number of certmanager",
+	Long:  "Prints the version number of certmanager",
+	Run: func(cmd *cobra.Command, args []string) {
+		logrus.Print("v0.0.1")
+	},
 }
 
-func loadServer(CA *x509.Certificate, CAKey *ecdsa.PrivateKey) (*x509.Certificate, *ecdsa.PrivateKey) {
-	verifyServer(CA, CAKey)
-	logrus.Info("Verify Server.key match Server.pem")
-	pkey, err := ioutil.ReadFile(SERVERPATH + "Server.key")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ioutil.ReadFile(SERVERPATH+"Server.key")`)
-	}
-	pblock, _ := pem.Decode(pkey)
-	key, err := x509.ParseECPrivateKey(pblock.Bytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseECPrivateKey(pkey)`)
-	}
-	dcert, err := ioutil.ReadFile(SERVERPATH + "Server.pem")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ioutil.ReadFile(SERVERPATH+"Server.pem")`)
-	}
-	cblock, _ := pem.Decode(dcert)
-	cert, err := x509.ParseCertificate(cblock.Bytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseCertificate(cblock.Bytes)`)
-	}
-	if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-		logrus.Fatal("Server.pem does not match Server.key")
-	}
-	logrus.Info("Verify Server.pem signed by CA")
-	if err := cert.CheckSignatureFrom(CA); err != nil {
-		logrus.WithError(err).Fatal("Verify Signature.")
-	}
-	if !cert.NotAfter.Equal(serverTemplate.NotAfter) {
-		logrus.Fatal("Server cert NotAfter does not match config file.")
-	}
-	if cert.Subject.CommonName != serverTemplate.Subject.CommonName {
-		logrus.Fatal("Server cert CommonName does not match config file.")
-	}
-	if !reflect.DeepEqual(cert.Subject.Organization, serverTemplate.Subject.Organization) {
-		logrus.Fatal("Server cert Organization does not match config file.")
-	}
-	if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, serverTemplate.Subject.OrganizationalUnit) {
-		logrus.Fatal("Server cert OrganizationalUnit does not match config file.")
-	}
-	return cert, key
+var validateServer bool
+var validateClient bool
+var validateCmd = &cobra.Command{
+	Use:   "validate",
+	Short: "validate generated certificates (always validates CA)",
+	Long:  "use this command to validate the certificates you have generated\nnote that CA certificates are always validated.",
+	Run: func(cmd *cobra.Command, args []string) {
+		if !validateServer && !validateClient {
+			_ = cmd.Help()
+			return
+		}
+		if validateServer {
+			for _, p := range findCerts("SERVER") {
+				if !CertLoad(p).Validate(CAPair) {
+					logrus.Warn(p, "Invalid Certificates")
+					continue
+				}
+				logrus.Info(p, " OK")
+			}
+		}
+		if validateClient {
+			for _, p := range findCerts("CLIENT") {
+				if !CertLoad(p).Validate(CAPair) {
+					logrus.Warn(p, "Invalid Certificates")
+					continue
+				}
+				logrus.Info(p, " OK")
+			}
+		}
+	},
 }
 
-func verifyServer(CA *x509.Certificate, CAKey *ecdsa.PrivateKey) {
-	if err := os.MkdirAll(CAPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(CAPATH, 0600)`)
-	}
-	if err := os.MkdirAll(SERVERPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(SERVERPATH, 0600)`)
-	}
-	if err := os.MkdirAll(CLIENTPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(CLIENTPATH, 0600)`)
-	}
-	if _, err := os.Stat(SERVERPATH + "Server.key"); os.IsNotExist(err) {
-		logrus.Info("Generating Server.key")
-		key := genPrivateKey(elliptic.P256())
-		keyOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(keyOut, pemBlockForKey(key)); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(keyOut, pemBlockForKey(key))`)
-		}
-		if ioErr := ioutil.WriteFile(SERVERPATH+"Server.key", keyOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(SERVERPATH+"Server.key", keyOut.Bytes(), 0600)`)
-		}
-		keyOut.Reset()
-		logrus.Info("Generating Server.pem")
-		cert := genCert(key, &serverTemplate, CA, CAKey)
-		certOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})`)
-		}
-		if ioErr := ioutil.WriteFile(SERVERPATH+"Server.pem", certOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(SERVERPATH+"Server.pem", certOut.Bytes(), 0600);`)
-		}
-		certOut.Reset()
-		if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-			logrus.Fatal("Server.pem doesnt not match Server.key")
-		}
-	}
-	if _, err := os.Stat(SERVERPATH + "Server.pem"); os.IsNotExist(err) {
-		logrus.Info("Found Server.key, but no Server.pem. Generating Server.pem")
-		pkey, err := ioutil.ReadFile(SERVERPATH + "Server.key")
-		if err != nil {
-			logrus.WithError(err).Fatal(`ioutil.ReadFile(SERVERPATH + "Server.key")`)
-		}
-		pblock, _ := pem.Decode(pkey)
-		key, err := x509.ParseECPrivateKey(pblock.Bytes)
-		if err != nil {
-			logrus.WithError(err).Fatal(`x509.ParseECPrivateKey(pkey)`)
-		}
-		cert := genCert(key, &serverTemplate, CA, CAKey)
-		certOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})`)
-		}
-		if ioErr := ioutil.WriteFile(SERVERPATH+"Server.pem", certOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(SERVERPATH+"Server.pem", certOut.Bytes(), 0600);`)
-		}
-		certOut.Reset()
-		if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-			logrus.Fatal("Server.pem doesnt not match Server.key")
-		}
-		return
-	}
+var generateCMD = &cobra.Command{
+	Use:   "generate",
+	Short: "generate new certificate from CA",
+	Long:  "generate new certificate from CA",
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
 }
 
-func loadClient(CA *x509.Certificate, CAKey *ecdsa.PrivateKey) (*x509.Certificate, *ecdsa.PrivateKey) {
-	verifyClient(CA, CAKey)
-	logrus.Info("Verify Client.key match Client.pem")
-	pkey, err := ioutil.ReadFile(CLIENTPATH + "Client.key")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ioutil.ReadFile(CLIENTPATH+"Client.key")`)
-	}
-	pblock, _ := pem.Decode(pkey)
-	key, err := x509.ParseECPrivateKey(pblock.Bytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseECPrivateKey(pkey)`)
-	}
-	dcert, err := ioutil.ReadFile(CLIENTPATH + "Client.pem")
-	if err != nil {
-		logrus.WithError(err).Fatal(`ioutil.ReadFile(CLIENTPATH+"Client.pem")`)
-	}
-	cblock, _ := pem.Decode(dcert)
-	cert, err := x509.ParseCertificate(cblock.Bytes)
-	if err != nil {
-		logrus.WithError(err).Fatal(`x509.ParseCertificate(cblock.Bytes)`)
-	}
-	if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-		logrus.Fatal("Client.pem does not match Client.key")
-	}
-	logrus.Info("Verify Client.pem signed by CA")
-	if err := cert.CheckSignatureFrom(CA); err != nil {
-		logrus.WithError(err).Fatal("Verify Signature.")
-	}
-	if !cert.NotAfter.Equal(clientTemplate.NotAfter) {
-		logrus.Fatal("Client cert NotAfter does not match config file.")
-	}
-	if cert.Subject.CommonName != clientTemplate.Subject.CommonName {
-		logrus.Fatal("Client cert CommonName does not match config file.")
-	}
-	if !reflect.DeepEqual(cert.Subject.Organization, clientTemplate.Subject.Organization) {
-		logrus.Fatal("Client cert Organization does not match config file.")
-	}
-	if !reflect.DeepEqual(cert.Subject.OrganizationalUnit, clientTemplate.Subject.OrganizationalUnit) {
-		logrus.Fatal("Client cert OrganizationalUnit does not match config file.")
-	}
-	return cert, key
+var serverHostnamesVar []string
+var serverIPsVar []net.IP
+var serverValidNotAfterVar time.Duration
+var serverCN string
+var serverOrg []string
+var serverOU []string
+var serverCertName string
+var generateServerCMD = &cobra.Command{
+	Use:   "server",
+	Short: "generate server certificate and key",
+	Long:  "generate server certificate and key",
+	Run: func(cmd *cobra.Command, args []string) {
+		template := x509.Certificate(serverTemplate)
+		template.Subject.Organization = serverOrg
+		template.Subject.CommonName = serverCN
+		template.Subject.OrganizationalUnit = serverOU
+		template.NotAfter = time.Now().Add(serverValidNotAfterVar).Truncate(time.Second)
+		template.DNSNames = serverHostnamesVar
+		template.IPAddresses = serverIPsVar
+		certPair := CertGen(ServerCert, &template, CAPair)
+		if certPair.Validate(CAPair) {
+			if err := certPair.Save(SERVERPATH + serverCertName); err != nil {
+				logrus.WithError(err).Fatal("Certificate could not be saved.")
+			}
+		}
+	},
 }
 
-func verifyClient(CA *x509.Certificate, CAKey *ecdsa.PrivateKey) {
-	if err := os.MkdirAll(CAPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(CAPATH, 0600)`)
-	}
-	if err := os.MkdirAll(SERVERPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(SERVERPATH, 0600)`)
-	}
-	if err := os.MkdirAll(CLIENTPATH, 0700); err != nil {
-		logrus.WithError(err).Fatal(`os.MkdirAll(CLIENTPATH, 0600)`)
-	}
-	if _, err := os.Stat(CLIENTPATH + "Client.key"); os.IsNotExist(err) {
-		logrus.Info("Generating Client.key")
-		key := genPrivateKey(elliptic.P256())
-		keyOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(keyOut, pemBlockForKey(key)); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(keyOut, pemBlockForKey(key))`)
+var clientValidNotAfterVar time.Duration
+var clientCN string
+var clientOrg []string
+var clientOU []string
+var clientCertName string
+var generateClientCMD = &cobra.Command{
+	Use:   "client",
+	Short: "generate client certificate and key",
+	Long:  "generate client certificate and key",
+	Run: func(cmd *cobra.Command, args []string) {
+		template := x509.Certificate(clientTemplate)
+		template.Subject.Organization = clientOrg
+		template.Subject.CommonName = clientCN
+		template.Subject.OrganizationalUnit = clientOU
+		template.NotAfter = time.Now().Add(clientValidNotAfterVar).Truncate(time.Second)
+		certPair := CertGen(ClientCert, &template, CAPair)
+		if certPair.Validate(CAPair) {
+			if err := certPair.Save(CLIENTPATH + clientCertName); err != nil {
+				logrus.WithError(err).Fatal("Certificate could not be saved.")
+			}
 		}
-		if ioErr := ioutil.WriteFile(CLIENTPATH+"Client.key", keyOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(CLIENTPATH+"Client.key", keyOut.Bytes(), 0600)`)
-		}
-		keyOut.Reset()
-		logrus.Info("Generating Client.pem")
-		cert := genCert(key, &clientTemplate, CA, CAKey)
-		certOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})`)
-		}
-		if ioErr := ioutil.WriteFile(CLIENTPATH+"Client.pem", certOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(CLIENTPATH+"Client.pem", certOut.Bytes(), 0600);`)
-		}
-		certOut.Reset()
-		if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-			logrus.Fatal("Client.pem doesnt not match Client.key")
-		}
-	}
-	if _, err := os.Stat(CLIENTPATH + "Client.pem"); os.IsNotExist(err) {
-		logrus.Info("Found Client.key, but no Client.pem. Generating Client.pem")
-		pkey, err := ioutil.ReadFile(CLIENTPATH + "Client.key")
-		if err != nil {
-			logrus.WithError(err).Fatal(`ioutil.ReadFile(CLIENTPATH + "Client.key")`)
-		}
-		pblock, _ := pem.Decode(pkey)
-		key, err := x509.ParseECPrivateKey(pblock.Bytes)
-		if err != nil {
-			logrus.WithError(err).Fatal(`x509.ParseECPrivateKey(pkey)`)
-		}
-		cert := genCert(key, &clientTemplate, CA, CAKey)
-		certOut := &bytes.Buffer{}
-		if pemErr := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); pemErr != nil {
-			logrus.WithError(pemErr).Fatal(`pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})`)
-		}
-		if ioErr := ioutil.WriteFile(CLIENTPATH+"Client.pem", certOut.Bytes(), 0600); ioErr != nil {
-			logrus.WithError(ioErr).Fatal(`ioutil.WriteFile(CLIENTPATH+"Client.pem", certOut.Bytes(), 0600);`)
-		}
-		certOut.Reset()
-		if !(*cert.PublicKey.(*ecdsa.PublicKey)).IsOnCurve(key.X, key.Y) {
-			logrus.Fatal("Client.pem doesnt not match Client.key")
-		}
-		return
-	}
+	},
 }
 
-func main() {
+func setupViper() {
 	vconf, err := readConfig(configfile, map[string]interface{}{
 		"ca": map[string]interface{}{
 			"org":      "ldbgrpc",
@@ -719,6 +579,7 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Fatal("Config parse error")
 	}
+
 	//Configure CA tempalte
 	rootTemplate.Subject = pkix.Name{
 		Organization: []string{vconf.GetString("ca.org")},
@@ -726,7 +587,7 @@ func main() {
 	}
 	rootTemplate.NotAfter = vconf.GetTime("ca.notafter")
 
-	//Configure server certificate template
+	//Configure default server certificate template
 	serverTemplate.Subject = pkix.Name{
 		Organization:       []string{vconf.GetString("server.org")},
 		CommonName:         vconf.GetString("server.cn"),
@@ -740,7 +601,7 @@ func main() {
 	}
 	serverTemplate.IPAddresses = ips
 
-	//Configure client certificate tempalte
+	//Configure default client certificate tempalte
 
 	clientTemplate.Subject = pkix.Name{
 		Organization:       []string{vconf.GetString("client.org")},
@@ -748,14 +609,58 @@ func main() {
 		OrganizationalUnit: vconf.GetStringSlice("client.ou"),
 	}
 	clientTemplate.NotAfter = vconf.GetTime("client.notafter")
+}
 
-	//load ROOT CA
-	cacert, cakey := loadCA()
-	_, _ = loadServer(cacert, cakey)
-	_, _ = loadClient(cacert, cakey)
-	fmt.Println(findCerts("SERVER"))
-	fmt.Println(findCerts("CLIENT"))
-	CAPair := CertLoad("./certs/CA")
-	CAPair.MustValidate()
-	spew.Dump(CAPair)
+func setupDirs() {
+	if err := os.MkdirAll(CAPATH, 0700); err != nil {
+		logrus.WithError(err).Fatal(`os.MkdirAll(CAPATH, 0600)`)
+	}
+	if err := os.MkdirAll(SERVERPATH, 0700); err != nil {
+		logrus.WithError(err).Fatal(`os.MkdirAll(SERVERPATH, 0600)`)
+	}
+	if err := os.MkdirAll(CLIENTPATH, 0700); err != nil {
+		logrus.WithError(err).Fatal(`os.MkdirAll(CLIENTPATH, 0600)`)
+	}
+}
+
+func init() {
+	setupDirs()
+	setupViper()
+	cobra.EnableCommandSorting = true
+	cobra.EnablePrefixMatching = true
+	rootCmd.AddCommand(versionCmd)
+	//validate command
+	validateCmd.Flags().BoolVarP(&validateServer, "server", "s", false, "validates all server certificates")
+	validateCmd.Flags().BoolVarP(&validateClient, "client", "c", false, "validates all client certificates")
+	rootCmd.AddCommand(validateCmd)
+	//generate command
+	//generate server command
+	generateServerCMD.Flags().StringSliceVarP(&serverHostnamesVar, "dnsnames", "", []string{"localhost"}, "Subject Alternate Name")
+	generateServerCMD.Flags().IPSliceVarP(&serverIPsVar, "ips", "", serverTemplate.IPAddresses, "IPAddress for Server Certificate")
+	generateServerCMD.Flags().DurationVarP(&serverValidNotAfterVar, "NotAfter", "", time.Hour*24*365, "Duration for certificate validity")
+	generateServerCMD.Flags().StringVarP(&serverCN, "CN", "", serverTemplate.Subject.CommonName, "Subject.CommonName")
+	generateServerCMD.Flags().StringSliceVarP(&serverOrg, "Org", "", serverTemplate.Subject.Organization, "Subject.Organization")
+	generateServerCMD.Flags().StringSliceVarP(&serverOU, "OU", "", serverTemplate.Subject.OrganizationalUnit, "Subject.OU")
+	generateServerCMD.Flags().StringVarP(&serverCertName, "name", "n", "", "name for server certificate")
+	generateServerCMD.MarkFlagRequired("name")
+	generateCMD.AddCommand(generateServerCMD)
+	//generate client command
+	generateClientCMD.Flags().DurationVarP(&clientValidNotAfterVar, "NotAfter", "", time.Hour*24*365, "Duration for certificate validity")
+	generateClientCMD.Flags().StringVarP(&clientCN, "CN", "", clientTemplate.Subject.CommonName, "Subject.CommonName")
+	generateClientCMD.Flags().StringSliceVarP(&clientOrg, "Org", "", clientTemplate.Subject.Organization, "Subject.Organization")
+	generateClientCMD.Flags().StringSliceVarP(&clientOU, "OU", "", clientTemplate.Subject.OrganizationalUnit, "Subject.OU")
+	generateClientCMD.Flags().StringVarP(&clientCertName, "name", "n", "", "name for server certificate")
+	generateClientCMD.MarkFlagRequired("name")
+	generateCMD.AddCommand(generateClientCMD)
+	rootCmd.AddCommand(generateCMD)
+
+	logrus.SetReportCaller(false)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+}
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
