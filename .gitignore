@@ -1,4 +1,6 @@
 ldbgrpc
+grpc_rest_server
+certmanager
 cache/
 cmd/client/client
 cmd/server/server
@@ -10,3 +12,4 @@ cmd/server/cache/
 cmd/client/__pycache__/
 cmd/server/certmanager/certmanager
 cmd/server/certmanager/certs/
+cmd/server/cache
