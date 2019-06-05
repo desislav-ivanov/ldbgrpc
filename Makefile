@@ -2,6 +2,7 @@
 
 generators: 
 	go generate ./...
+	go get -u -f ./pkg/client/swagger/v2/...
 
 godeps:
 	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
