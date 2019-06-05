@@ -39,8 +39,7 @@ message Payload {
 service Cache {
     rpc Get(SearchKey) returns (Payload){
         option (google.api.http) = {
-            post: "/v2/cache/Get",
-            body: "*"
+            get: "/v2/cache/Get/{key}",
         };
     };
     rpc StreamGetMany(stream SearchKey) returns (stream Payload){
@@ -59,8 +58,7 @@ service Cache {
     };
     rpc Delete(SearchKey) returns (Status) {
         option (google.api.http) = {
-            delete: "/v2/cache/Delete",
-            body: "*"
+            delete: "/v2/cache/Delete/{key}",
         };
     };
 }
