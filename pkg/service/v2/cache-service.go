@@ -234,6 +234,7 @@ func (s CacheServiceServer) Delete(ctx context.Context, sk *v2.SearchKey) (*v2.S
 	}
 	return &v2.Status{Code: v2.Status_OK}, nil
 }
+
 func (s CacheServiceServer) Put(ctx context.Context, pl *v2.Payload) (*v2.Status, error) {
 	if apiErr := s.checkAPI(pl.ApiVersion); apiErr != nil {
 		return &v2.Status{Code: v2.Status_Error}, apiErr
@@ -260,6 +261,8 @@ func (s CacheServiceServer) Put(ctx context.Context, pl *v2.Payload) (*v2.Status
 }
 
 func (s CacheServiceServer) Shutdown() {
-	s.ldb.Close()
+	if err := s.ldb.Close(); err != nil {
+		s.Log().WithError(err).Panic()
+	}
 	s.ldb = nil
 }
