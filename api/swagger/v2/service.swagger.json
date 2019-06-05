@@ -15,25 +15,24 @@
     "application/json"
   ],
   "paths": {
-    "/v1/cache/Delete": {
-      "post": {
+    "/v2/cache/Delete": {
+      "delete": {
         "operationId": "Delete",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1Status"
+              "$ref": "#/definitions/v2Status"
             }
           }
         },
         "parameters": [
           {
             "name": "body",
-            "description": " (streaming inputs)",
             "in": "body",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/definitions/v2SearchKey"
             }
           }
         ],
@@ -42,65 +41,24 @@
         ]
       }
     },
-    "/v1/cache/Get/{key}": {
-      "get": {
+    "/v2/cache/Get": {
+      "post": {
         "operationId": "Get",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1Payload"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Cache"
-        ]
-      }
-    },
-    "/v1/cache/GetAll": {
-      "get": {
-        "operationId": "GetAll",
-        "responses": {
-          "200": {
-            "description": "A successful response.(streaming responses)",
-            "schema": {
-              "$ref": "#/x-stream-definitions/v1Payload"
-            }
-          }
-        },
-        "tags": [
-          "Cache"
-        ]
-      }
-    },
-    "/v1/cache/GetMany": {
-      "post": {
-        "operationId": "GetMany",
-        "responses": {
-          "200": {
-            "description": "A successful response.(streaming responses)",
-            "schema": {
-              "$ref": "#/x-stream-definitions/v1Payload"
+              "$ref": "#/definitions/v2Payload"
             }
           }
         },
         "parameters": [
           {
             "name": "body",
-            "description": " (streaming inputs)",
             "in": "body",
             "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/definitions/v2SearchKey"
             }
           }
         ],
@@ -109,25 +67,24 @@
         ]
       }
     },
-    "/v1/cache/Put": {
+    "/v2/cache/Put": {
       "put": {
         "operationId": "Put",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1Status"
+              "$ref": "#/definitions/v2Status"
             }
           }
         },
         "parameters": [
           {
             "name": "body",
-            "description": " (streaming inputs)",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1Payload"
+              "$ref": "#/definitions/v2Payload"
             }
           }
         ],
@@ -178,26 +135,43 @@
         }
       }
     },
-    "v1Payload": {
+    "v2Payload": {
       "type": "object",
       "properties": {
-        "key": {
+        "apiVersion": {
           "type": "string"
         },
+        "key": {
+          "type": "string",
+          "format": "byte"
+        },
         "value": {
-          "type": "string"
+          "type": "string",
+          "format": "byte"
         }
       }
     },
-    "v1Status": {
+    "v2SearchKey": {
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    },
+    "v2Status": {
       "type": "object",
       "properties": {
         "code": {
-          "$ref": "#/definitions/v1StatusResponse"
+          "$ref": "#/definitions/v2StatusResponse"
         }
       }
     },
-    "v1StatusResponse": {
+    "v2StatusResponse": {
       "type": "string",
       "enum": [
         "OK",
@@ -207,17 +181,17 @@
     }
   },
   "x-stream-definitions": {
-    "v1Payload": {
+    "v2Payload": {
       "type": "object",
       "properties": {
         "result": {
-          "$ref": "#/definitions/v1Payload"
+          "$ref": "#/definitions/v2Payload"
         },
         "error": {
           "$ref": "#/definitions/runtimeStreamError"
         }
       },
-      "title": "Stream result of v1Payload"
+      "title": "Stream result of v2Payload"
     }
   }
 }

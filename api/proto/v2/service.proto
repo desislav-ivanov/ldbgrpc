@@ -1,9 +1,10 @@
 syntax = "proto3";
-package v1;
+package v2;
 
 import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-swagger/options/annotations.proto";
+
 
 option (grpc.gateway.protoc_gen_swagger.options.openapiv2_swagger) = {
     info: {
@@ -25,41 +26,41 @@ message Status {
 }
 
 message SearchKey {
-    string key = 1;
+    string apiVersion = 1;
+    bytes key = 2;
 }
 
 message Payload {
-    string key = 1;
-    string value = 2;
+    string apiVersion = 1;
+    bytes key = 2;
+    bytes value = 3;
 }
 
 service Cache {
     rpc Get(SearchKey) returns (Payload){
         option (google.api.http) = {
-            get: "/v1/cache/Get/{key}"
-        };
-    };
-    rpc GetMany(stream SearchKey) returns (stream Payload){
-        option (google.api.http) = {
-            post: "/v1/cache/GetMany"
-            body: "key"
-        };
-    };
-    rpc GetAll(google.protobuf.Empty) returns (stream Payload){
-        option (google.api.http) = {
-            get: "/v1/cache/GetAll"
-        };
-    };
-    rpc Put(stream Payload) returns (Status){
-        option (google.api.http) = {
-            put: "/v1/cache/Put"
+            post: "/v2/cache/Get",
             body: "*"
         };
     };
-    rpc Delete(stream SearchKey) returns (Status){
+    rpc StreamGetMany(stream SearchKey) returns (stream Payload){
+    };
+    rpc StreamGetAll(google.protobuf.Empty) returns (stream Payload){
+    };
+    rpc StreamPut(stream Payload) returns (Status){
+    };
+    rpc Put(Payload) returns (Status) {
         option (google.api.http) = {
-            post: "/v1/cache/Delete"
-            body: "key"
+            put: "/v2/cache/Put",
+            body: "*"
+        };
+    }
+    rpc StreamDelete(stream SearchKey) returns (Status){
+    };
+    rpc Delete(SearchKey) returns (Status) {
+        option (google.api.http) = {
+            delete: "/v2/cache/Delete",
+            body: "*"
         };
     };
 }
