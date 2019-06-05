@@ -15,7 +15,7 @@
     "application/json"
   ],
   "paths": {
-    "/v2/cache/Delete": {
+    "/v2/cache/Delete/{key}": {
       "delete": {
         "operationId": "Delete",
         "responses": {
@@ -28,12 +28,17 @@
         },
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
+            "name": "key",
+            "in": "path",
             "required": true,
-            "schema": {
-              "$ref": "#/definitions/v2SearchKey"
-            }
+            "type": "string",
+            "format": "byte"
+          },
+          {
+            "name": "apiVersion",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -41,8 +46,8 @@
         ]
       }
     },
-    "/v2/cache/Get": {
-      "post": {
+    "/v2/cache/Get/{key}": {
+      "get": {
         "operationId": "Get",
         "responses": {
           "200": {
@@ -54,12 +59,17 @@
         },
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
+            "name": "key",
+            "in": "path",
             "required": true,
-            "schema": {
-              "$ref": "#/definitions/v2SearchKey"
-            }
+            "type": "string",
+            "format": "byte"
+          },
+          {
+            "name": "apiVersion",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -146,18 +156,6 @@
           "format": "byte"
         },
         "value": {
-          "type": "string",
-          "format": "byte"
-        }
-      }
-    },
-    "v2SearchKey": {
-      "type": "object",
-      "properties": {
-        "apiVersion": {
-          "type": "string"
-        },
-        "key": {
           "type": "string",
           "format": "byte"
         }
