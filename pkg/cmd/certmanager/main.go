@@ -562,6 +562,7 @@ func setupViper() {
 			"notafter": time.Now().Add(time.Hour * 24 * 365).Truncate(time.Second).String(),
 			"host": []string{
 				"localhost",
+				"ldbgrpc",
 			},
 			"ips": []net.IP{
 				net.ParseIP("127.0.0.1"),

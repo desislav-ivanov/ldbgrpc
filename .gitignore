@@ -5,6 +5,8 @@ cache/
 cmd/client/client
 cmd/server/server
 cmd/server/cache/
+certs/
+config.yaml
 **/certs/*.crt
 **/certs/*.key
 **/certs/*.pem

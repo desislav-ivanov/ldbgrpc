@@ -35,7 +35,7 @@ func RunServer(ctx context.Context, v1API v1.CacheServer, CAPath string, ServerC
 	if err != nil {
 		logrus.WithField("ServerCert", ServerCert).WithField("ServerKey", ServerKey).WithError(err).Fatal("Server Credentials.")
 	}
-	ccreds, err := credentials.NewClientTLSFromFile(CAPath, "")
+	ccreds, err := credentials.NewClientTLSFromFile(CAPath, "ldbgrpc")
 	if err != nil {
 		logrus.WithField("CACert", CAPath).WithError(err).Fatal("CA Certificate.")
 	}
@@ -67,6 +67,7 @@ func RunServer(ctx context.Context, v1API v1.CacheServer, CAPath string, ServerC
 		Addr:    ":9090",
 		Handler: grpcHandler(s, mux),
 		TLSConfig: &tls.Config{
+			ServerName:   "ldbgrpc",
 			Certificates: []tls.Certificate{certPair},
 			NextProtos:   []string{"h2"},
 		},
