@@ -18,3 +18,7 @@ setup: godeps pydeps generators
 all: generators
 	go build -o grpc_rest_server ./cmd/server 
 	go build -o certmanager ./pkg/cmd/certmanager
+
+debug:
+	./certmanager
+	GODEBUG=http2debug=2 GRPC_TRACE=all GRPC_VERBOSITY=DEBUG GRPC_GO_LOG_VERBOSITY_LEVEL=99 GRPC_GO_LOG_SEVERITY_LEVEL=info ./grpc_rest_server
