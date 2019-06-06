@@ -7,7 +7,9 @@ generators:
 godeps:
 	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
 	go get -u github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger
-	go get -u github.com/golang/protobuf/protoc-gen-go
+	go get -d -u github.com/golang/protobuf/protoc-gen-go
+	go install github.com/golang/protobuf/protoc-gen-go
+	go get -u github.com/go-swagger/go-swagger/cmd/swagger
 
 pydeps:
 	pip install -r py-requirements.txt
@@ -16,6 +18,11 @@ echo:
 	$(info ${OS} ${ARCH} ${VER} ${GRPC_GATEWAY_PATH})
 
 setup: godeps pydeps generators
+
+build:
+	go build -o grpc_rest_server ./cmd/server
+	go build -o certmanager ./pkg/cmd/certmanager 
+
 all: generators
 	go build -o grpc_rest_server ./cmd/server 
 	go build -o certmanager ./pkg/cmd/certmanager

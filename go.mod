@@ -13,6 +13,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/go-openapi/analysis v0.19.0 // indirect
 	github.com/go-openapi/errors v0.19.0
+	github.com/go-openapi/inflect v0.19.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.0 // indirect
 	github.com/go-openapi/jsonreference v0.19.0 // indirect
 	github.com/go-openapi/loads v0.19.0 // indirect
@@ -21,12 +22,15 @@ require (
 	github.com/go-openapi/strfmt v0.19.0
 	github.com/go-openapi/swag v0.19.0
 	github.com/go-openapi/validate v0.19.0
+	github.com/go-swagger/go-swagger v0.19.0 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golang/protobuf v1.3.1
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/pprof v0.0.0-20190515194954-54271f7e092f // indirect
+	github.com/gorilla/handlers v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.0.0
 	github.com/grpc-ecosystem/grpc-gateway v1.9.0
+	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/kisielk/errcheck v1.2.0 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.4 // indirect
@@ -49,6 +53,7 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/toqueteos/webbrowser v1.1.0 // indirect
 	github.com/ugorji/go v1.1.5-pre // indirect
 	go.opencensus.io v0.22.0 // indirect
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5 // indirect
@@ -60,9 +65,9 @@ require (
 	golang.org/x/net v0.0.0-20190603091049-60506f45cf65 // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	golang.org/x/sys v0.0.0-20190602015325-4c4f7f33c9ed // indirect
-	golang.org/x/tools v0.0.0-20190603231351-8aaa1484dc10 // indirect
+	golang.org/x/tools v0.0.0-20190606050223-4d9ae51c2468 // indirect
 	google.golang.org/appengine v1.6.0 // indirect
-	google.golang.org/genproto v0.0.0-20190530194941-fb225487d101
+	google.golang.org/genproto v0.0.0-20190605220351-eb0b1bdb6ae6
 	google.golang.org/grpc v1.21.1
-	honnef.co/go/tools v0.0.0-20190604153307-63e9ff576adb // indirect
+	honnef.co/go/tools v0.0.0-20190605142022-0a11fc526260 // indirect
 )
