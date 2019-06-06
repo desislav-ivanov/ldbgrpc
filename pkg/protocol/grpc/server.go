@@ -29,11 +29,23 @@ import (
 
 func grpcHandler(grpcServer *grpc.Server, otherHandler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
 			grpcServer.ServeHTTP(w, r)
 		} else {
 			otherHandler.ServeHTTP(w, r)
 		}
+	})
+}
+
+func serveExtras(mux *http.ServeMux) {
+	swaggerUI := http.FileServer(http.Dir("./third_party/swagger-ui/"))
+	mux.Handle("/ui/", http.StripPrefix("/ui/", swaggerUI))
+	mux.HandleFunc("/CA.pem", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./certs/CA/CA.pem")
+	})
+	mux.HandleFunc("/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./api/swagger/v2/service.swagger.json")
 	})
 }
 
@@ -79,6 +91,10 @@ func RunServerV2(ctx context.Context, v2API v2.CacheServer, CAPath string, Serve
 	if err != nil {
 		logrus.WithError(err).Fatal("net.Listener() bind failed.")
 	}
+	slis, err := net.Listen("tcp", ":9080")
+	if err != nil {
+		logrus.WithError(err).Fatal("net.Listener() bind failed.")
+	}
 
 	s := grpc.NewServer(serverOptions...)
 	v2.RegisterCacheServer(s, v2API)
@@ -89,6 +105,10 @@ func RunServerV2(ctx context.Context, v2API v2.CacheServer, CAPath string, Serve
 		logrus.WithError(err).Fatal("RegisterCacheHandlerFromEndpoint failed.")
 	}
 	mux.Handle("/", gwmux)
+	muxStatic := http.NewServeMux()
+	serveExtras(muxStatic)
+
+	errs := make(chan error)
 
 	srv := &http.Server{
 		Addr:    ":9090",
@@ -103,21 +123,32 @@ func RunServerV2(ctx context.Context, v2API v2.CacheServer, CAPath string, Serve
 		},
 	}
 
+	staticSrv := &http.Server{
+		Addr:    ":9080",
+		Handler: muxStatic,
+	}
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for range c {
 			logrus.Warn("Shutdown GRPC Server...")
 			_ = srv.Shutdown(ctx)
+			_ = staticSrv.Shutdown(ctx)
 		}
 	}()
-	logrus.Info("Starting GRPC Server...")
-	if err := srv.Serve(tls.NewListener(lis, srv.TLSConfig)); err != nil {
-		if err != http.ErrServerClosed {
-			logrus.WithError(err).Fatal("GRPC Serve() failed.")
-		}
-		return err
-	}
+	go func() {
+		logrus.Info("Starting GRPC Server...")
+		errs <- srv.Serve(tls.NewListener(lis, srv.TLSConfig))
+	}()
+	go func() {
+		logrus.Info("Starting Static Server...")
+		errs <- staticSrv.Serve(slis)
+	}()
+
+	<-errs
+	<-errs
+	close(errs)
 	return nil
 }
 

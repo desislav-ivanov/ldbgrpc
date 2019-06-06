@@ -5,8 +5,7 @@
     "version": "v2.0.0"
   },
   "schemes": [
-    "https",
-    "wss"
+    "https"
   ],
   "consumes": [
     "application/json"
@@ -77,7 +76,7 @@
         ]
       }
     },
-    "/v2/cache/Put": {
+    "/v2/cache/Put/{key}": {
       "put": {
         "operationId": "Put",
         "responses": {
@@ -90,11 +89,19 @@
         },
         "parameters": [
           {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "byte"
+          },
+          {
             "name": "body",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v2Payload"
+              "type": "string",
+              "format": "byte"
             }
           }
         ],
