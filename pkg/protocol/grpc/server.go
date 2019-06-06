@@ -3,12 +3,16 @@ package grpc
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"google.golang.org/grpc/credentials"
 
@@ -40,24 +44,36 @@ func RunServerV2(ctx context.Context, v2API v2.CacheServer, CAPath string, Serve
 	entry := logrus.NewEntry(logger)
 	grpc_logrus.ReplaceGrpcLogger(entry)
 
+	CAPem, err := ioutil.ReadFile(CAPath)
+	if err != nil {
+		logrus.WithField("CACert", CAPath).WithError(err).Fatal("CA Certificate.")
+	}
+	certpool := x509.NewCertPool()
+	if ok := certpool.AppendCertsFromPEM(CAPem); !ok {
+		logrus.WithField("CACert", CAPath).Fatal("AppendCertsFromPEM()")
+	}
+
 	screds, err := credentials.NewServerTLSFromFile(ServerCert, ServerKey)
 	if err != nil {
 		logrus.WithField("ServerCert", ServerCert).WithField("ServerKey", ServerKey).WithError(err).Fatal("Server Credentials.")
-	}
-	ccreds, err := credentials.NewClientTLSFromFile(CAPath, "ldbgrpc")
-	if err != nil {
-		logrus.WithField("CACert", CAPath).WithError(err).Fatal("CA Certificate.")
 	}
 
 	certPair, err := tls.LoadX509KeyPair(ServerCert, ServerKey)
 	if err != nil {
 		logrus.WithField("ServerCert", ServerCert).WithField("ServerKey", ServerKey).WithError(err).Fatal("Server Credentials.")
 	}
-
 	serverOptions := []grpc.ServerOption{
 		grpc.Creds(screds),
 	}
-	dialOptions := []grpc.DialOption{grpc.WithTransportCredentials(ccreds), grpc.WithUserAgent("grpc-gateway")}
+	dialOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			RootCAs:      certpool,
+			ClientCAs:    certpool,
+			ServerName:   "ldbgrpc",
+			Certificates: []tls.Certificate{certPair},
+		})),
+		grpc.WithUserAgent("grpc-gateway"),
+	}
 
 	lis, err := net.Listen("tcp", ":9090")
 	if err != nil {
@@ -78,6 +94,9 @@ func RunServerV2(ctx context.Context, v2API v2.CacheServer, CAPath string, Serve
 		Addr:    ":9090",
 		Handler: grpcHandler(s, mux),
 		TLSConfig: &tls.Config{
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			RootCAs:      certpool,
+			ClientCAs:    certpool,
 			ServerName:   "ldbgrpc",
 			Certificates: []tls.Certificate{certPair},
 			NextProtos:   []string{"h2"},
@@ -145,6 +164,15 @@ func RunServerV1(ctx context.Context, v1API v1.CacheServer, CAPath string, Serve
 		Addr:    ":9090",
 		Handler: grpcHandler(s, mux),
 		TLSConfig: &tls.Config{
+			VerifyPeerCertificate: func(certs [][]byte, chains [][]*x509.Certificate) error {
+				for i := range certs {
+					spew.Dump(certs[i])
+				}
+				for i := range chains {
+					spew.Dump(chains[i])
+				}
+				return nil
+			},
 			ServerName:   "ldbgrpc",
 			Certificates: []tls.Certificate{certPair},
 			NextProtos:   []string{"h2"},
