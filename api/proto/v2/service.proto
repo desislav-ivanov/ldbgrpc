@@ -12,7 +12,6 @@ option (grpc.gateway.protoc_gen_swagger.options.openapiv2_swagger) = {
       version: "v2.0.0";
     };
     schemes: HTTPS;
-    schemes: WSS;
     consumes: "application/json";
     produces: "application/json";
   };
@@ -50,8 +49,8 @@ service Cache {
     };
     rpc Put(Payload) returns (Status) {
         option (google.api.http) = {
-            put: "/v2/cache/Put",
-            body: "*"
+            put: "/v2/cache/Put/{key}",
+            body: "value"
         };
     }
     rpc StreamDelete(stream SearchKey) returns (Status){

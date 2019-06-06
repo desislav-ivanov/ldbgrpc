@@ -27,7 +27,7 @@ const (
 )
 
 // DefaultSchemes are the default schemes found in Meta (info) section of spec file
-var DefaultSchemes = []string{"https", "wss"}
+var DefaultSchemes = []string{"https"}
 
 // NewHTTPClient creates a new ldbgrpc client HTTP client.
 func NewHTTPClient(formats strfmt.Registry) *LdbgrpcClient {
